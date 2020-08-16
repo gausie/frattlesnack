@@ -7,8 +7,8 @@ authors = ["Sam Gaus <sam@gaus.co.uk>"]
 [tool.poetry.dependencies]
 python = "^3.8"
 pulp = "^2.3"
-frattlesnake = {path = "../frattlesnake"}
 tqdm = "^4.48.2"
+frattlesnake = "^0.1.2"
 
 [tool.poetry.dev-dependencies]
 

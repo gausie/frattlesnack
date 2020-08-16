@@ -28,20 +28,14 @@ version = "0.16"
 
 [[package]]
 category = "main"
-description = ""
-develop = true
+description = "frattlesnake is a bridge and library from KoLmafia's Java environment to a Python environment"
 name = "frattlesnake"
 optional = false
-python-versions = "^3.8"
-version = "0.1.1"
+python-versions = ">=3.8,<4.0"
+version = "0.1.2"
 
 [package.dependencies]
-pyjnius = "^1.3.0"
-
-[package.source]
-reference = ""
-type = "directory"
-url = "../frattlesnake"
+pyjnius = ">=1.3.0,<2.0.0"
 
 [[package]]
 category = "main"
@@ -98,7 +92,7 @@ version = "4.48.2"
 dev = ["py-make (>=0.1.0)", "twine", "argopt", "pydoc-markdown"]
 
 [metadata]
-content-hash = "30a26af24ac29628d50963e24bc34fdfad9aad06cd9fd7d8da851bc01661b539"
+content-hash = "a844c97407748b9cf7ecea97f5ff4ad1c13534a9eefceee55a049a5c08390c9c"
 lock-version = "1.0"
 python-versions = "^3.8"
 
@@ -146,7 +140,10 @@ docutils = [
     {file = "docutils-0.16-py2.py3-none-any.whl", hash = "sha256:0c5b78adfbf7762415433f5515cd5c9e762339e23369dbe8000d84a4bf4ab3af"},
     {file = "docutils-0.16.tar.gz", hash = "sha256:c2de3a60e9e7d07be26b7f2b00ca0309c207e06c100f9cc2a94931fc75a478fc"},
 ]
-frattlesnake = []
+frattlesnake = [
+    {file = "frattlesnake-0.1.2-py3-none-any.whl", hash = "sha256:8a36f11cbbfe83e0eb9719d6e529f5ff57174fe8012d28b76f14d515eef11f63"},
+    {file = "frattlesnake-0.1.2.tar.gz", hash = "sha256:15e98f09870576096f4ef4adf83ebfcd85a900bd6bdd727b8646de02b4615924"},
+]
 pulp = [
     {file = "PuLP-2.3-py3-none-any.whl", hash = "sha256:1953894015ed3b9dfefea14a2fba1deef4b47138ef847d05c66ef9806f9fc3b4"},
     {file = "PuLP-2.3.tar.gz", hash = "sha256:9d8ecf532868cc31fa9ff59ee5d5b2049600c5c902c18c794a2bad677c1f92e5"},
