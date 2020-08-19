@@ -1,194 +1,27 @@
 from typing import Dict, List, Optional, Tuple
-import math
-from frattlesnake import frattlesnake, Item, Modifier, Effect
+from frattlesnake import Item, Modifier, Effect
 from pulp import LpProblem, LpMaximize, LpVariable, lpSum
 from tqdm import tqdm
-from dataclasses import dataclass
+from itertools import groupby
 from enum import Enum
-from dataclasses import dataclass, field
 
-class Organ(Enum):
-    Stomach = "fullness"
-    Liver = "inebriety"
-    Spleen = "spleen_hit"
-
-organ_cleaners = {
-    Organ.Spleen: {
-        "extra-greasy slider": 5,
-        "jar of fermented pickle juice": 5,
-        "mojo filter": 1,
-    },
-    Organ.Liver: {
-        "Alien plant pod": 3,
-        "cuppa Sobrie tea": 1,
-        "Mr. Burnsger": 2,
-        "spice melange": 3,
-        "The Plumber's mushroom stew": 1,
-        "Ultra Mega Sour Ball": 3,
-    },
-    Organ.Stomach: {
-        "alien animal milk": 3,
-        "Cuppa Voraci tea": 1,
-        "Doc Clock's thyme cocktail": 2,
-        "lupine appetite hormones": 3,
-        "spice melange": 3,
-        "sweet tooth": 1,
-        "The Mad Liquor": 1,
-        "Ultra Mega Sour Ball": 3,
-    },
-}
-
-limits = {
-    "alien animal milk": 1,
-    "alien plant pod": 1,
-    "cuppa Sobrie tea": 1,
-    "cuppa Voraci tea": 1,
-    "Doc Clock's thyme cocktail": 2,
-    "lupine appetite hormones": 1,
-    "mojo filter": 3,
-    "Mr. Burnsger": 2,
-    "spice melange": 1,
-    "sweet tooth": 1,
-    "The Mad Liquor": 1,
-    "The Plumber's mushroom stew": 1,
-    "ultra mega sour ball": 1,
-}
-
-utensils = {Organ.Stomach: ["Ol' Scratch's salad fork"],
-            Organ.Liver: ["Frosty's frosty mug"]}
-
+from frattlesnack.Consumable import Consumable
+from frattlesnack.utils import Organ, limits, organ_cleaners, utensils, price_cache
 
 other_items = (list(limits.keys()) +
                [item for organ in organ_cleaners.values() for item in organ.keys()] +
                [item for items in utensils.values() for item in items])
 
-
-price_cache = {} # type: Dict[int, float]
-
-@dataclass
-class Consumable:
-    item: Optional[Item] = None
-    utensil: Optional[Item] = None
-    _name: Optional[str] = None
-    _effect: Optional[Effect] = None
-    _effect_duration: int = 0
-    _space: Dict[Organ, int] = field(default_factory=dict)
-
-    @staticmethod
-    def from_item(item: Item, utensil: Optional[Item] = None) -> "Consumable":
-        consumable = Consumable()
-        consumable.item = item
-        consumable.utensil = utensil
-        return consumable
-
-    @staticmethod
-    def all_utensils(item: Item) -> List["Consumable"]:
-        without = [Consumable.from_item(item)]
-
-        for organ in [Organ.Stomach, Organ.Liver]:
-            if getattr(item, organ.value):
-                return [Consumable.from_item(item, Item(utensil)) for utensil in utensils[organ]] + without
-
-        return without
-
-    def __eq__(self, other) -> bool:
-        if isinstance(other, Consumable):
-            return self.item.id == other.item.id and self.utensil == other.utensil
-
-        return super().__eq__(other)
-
-    def __hash__(self) -> int:
-        if self._name:
-            return hash(self._name)
-
-        if self.utensil:
-            return hash(f"{self.item.id}-{self.utensil.id}")
-
-        return hash(self.item.id)
-
-    def __str__(self) -> str:
-        if self._name:
-            return self._name
-
-        if self.utensil:
-            return f"{self.item.name} with {self.utensil.name}"
-
-        return self.item.name
-
-    def space(self, organ: Organ) -> Optional[int]:
-        if self._space.get(organ):
-            print(self._space.get(organ))
-            return self._space.get(organ)
-
-        if self.item:
-            return getattr(self.item, organ.value) or 0
-
-        return 0
-
-    @property
-    def effect(self) -> Optional[Effect]:
-        if self._effect:
-            return self._effect
-
-        if self.item:
-            return self.item.effect
-
-        return None
-
-    @property
-    def effect_duration(self) -> Optional[int]:
-        if self._effect_duration:
-            return self._effect_duration
-
-        if self.item:
-            return self.item.modifiers.get(Modifier.EffectDuration, 0)
-
-        return 0
-
-    @property
-    def price(self) -> Optional[float]:
-        if self.item is None:
-            return 0
-
-        price = price_cache.get(self.item.id, None)
-
-        if price is None:
-            return None
-
-        if self.utensil:
-            price += price_cache.get(self.utensil.id)
-
-        return price
-
-    @property
-    def adventures(self) -> float:
-        if self.item is None:
-            return 0
-
-        adventures = self.item.adventures
-
-        if self.utensil:
-            if self.utensil == Item("Ol' Scratch's salad fork"):
-                adventures = math.ceil(adventures * (1.5 if "SALAD" in self.item.notes else 1.3))
-
-        return adventures
-
-    def profit(self, quantity: int, meat_per_turn: int, base_meat: int, combat_chance: float) -> float:
-        if self.price is None:
-            return 0
-
-        gain = (self.adventures or 0) * meat_per_turn - self.price
-
-        if self.effect:
-            gain += self.effect.modifiers.get(Modifier.MeatDrop, 0.0) * base_meat * self.effect_duration * combat_chance
-
-        return gain * quantity
-
-
 synthesis_greedy = Consumable(_name="Synthesis: Greed", _effect=Effect("Synthesis: Greed"), _effect_duration=30, _space={Organ.Spleen: 1})
 
-
-def calculate_diet(base_items: List[Item], meat_per_turn: int, base_meat: int, combat_chance: float, starting_turns: int = 0) -> Tuple[float, Dict[Consumable, int]]:
+def calculate_diet(base_items: List[Item],
+                   meat_per_turn: int,
+                   stomach: int,
+                   liver: int,
+                   spleen: int,
+                   base_meat: int,
+                   combat_chance: float,
+                   starting_turns: int = 0) -> Tuple[float, Dict[Consumable, int]]:
     items = [i for item in base_items for i in Consumable.all_utensils(item)] + [synthesis_greedy]
 
     prob = LpProblem("Diet", LpMaximize)
@@ -203,27 +36,35 @@ def calculate_diet(base_items: List[Item], meat_per_turn: int, base_meat: int, c
     def organ_constraint(organ: Organ, limit: int):
         return lpSum([item.space(organ) * diet[item] for item in items]) <= limit + organ_cleaning(organ)
 
-    prob += organ_constraint(Organ.Stomach, 15)
-    prob += organ_constraint(Organ.Liver, 15)
-    prob += organ_constraint(Organ.Spleen, 15)
+    prob += organ_constraint(Organ.Stomach, stomach)
+    prob += organ_constraint(Organ.Liver, liver)
+    prob += organ_constraint(Organ.Spleen, spleen)
 
     for item, limit in limits.items():
         prob += lpSum([diet[variant] for variant in Consumable.all_utensils(Item(item))]) <= limit
+
+    turns = lpSum([(item.adventures or 0) * diet[item] for item in diet]) + starting_turns
+
+    for effect, effect_items in groupby(items, lambda i: i.effect):
+        if effect is not None:
+            effect_items = list(effect_items)
+            unit = min([item.effect_duration for item in effect_items if item.effect_duration is not None])
+            prob += lpSum([item.effect_duration * diet[item] for item in effect_items]) <= turns + (unit - 1)
 
     prob.writeLP("diet.lp")
     prob.setSolver()
     prob.solver.msg = 0
     prob.solve()
 
-    return prob.objective.value(), {item: diet[item].value() for item in items if diet[item].value() > 0}
+    return prob.objective.value(), {item: diet[item].value() for item in diet if diet[item].value() > 0}
 
-def populate_price_cache(items: List[Item]):
+def populate_price_cache(items: List[Item], average:int=10):
     with tqdm(items) as t:
         for item in t:
-            price_for_ten = item.price(historical=True, quantity=10)
+            price_for_ten = item.price(historical=True, quantity=average)
             t.set_description(f"{item.name}")
             if price_for_ten is not None:
-                price = price_for_ten / 10
+                price = price_for_ten / average
                 price_cache[item.id] = price
 
 def relevant(item: Item, organ: Optional[Organ] = None, threshold: float = 5.0) -> bool:
@@ -254,18 +95,30 @@ def relevant(item: Item, organ: Optional[Organ] = None, threshold: float = 5.0) 
 if __name__ == "__main__":
     #frattlesnake.login("onweb")
 
+    starting_turns = 200
+
     items = [item for item in Item.all()
              if (relevant(item, Organ.Stomach) or relevant(item, Organ.Liver) or relevant(item, Organ.Spleen, 1.5)) or relevant(item)]
 
     populate_price_cache(items)
 
     profit, diet = calculate_diet(items,
-                                  meat_per_turn=5500,
+                                  meat_per_turn=7000,
+                                  stomach=15,
+                                  liver=21,
+                                  spleen=15,
                                   base_meat=275,
-                                  combat_chance=0.7,
-                                  starting_turns=200)
+                                  combat_chance=28/30,
+                                  starting_turns=starting_turns)
 
-    print(f"Profit: {profit:,} meat")
+    cost = 0
+    turns = starting_turns
 
     for item, quantity in diet.items():
+        turns += (item.adventures or 0) * quantity
+        cost  += item.price * quantity
         print(f"Consume {item} x {quantity} ({str(item.adventures or 0)} turns @ {item.price:,} meat each)")
+
+    print(f"{turns} turns")
+    print(f"Profit (net): {profit:,} meat")
+    print(f"Profit (gross): {profit - cost:,} meat")

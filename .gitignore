@@ -4,6 +4,9 @@ kolmafia.jar
 # LP files
 *.lp
 
+# My own vscode file
+.vscode/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
